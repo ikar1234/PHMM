@@ -1,13 +1,13 @@
-## Profile Hidden Markov Models
+# Profile Hidden Markov Models
 
 I implemented .
 
 
-# Input
+## Input
 
 The models takes a multiple sequence alignment as an input. Supported formats are Jaspar,MEME,FASTA.
 
 
-# Training
+## Training
 
-# Evaluation
+## Evaluation
