@@ -2,6 +2,7 @@
 
 I implemented a Profile Hidden Markov Model (PHMM) in Python, which is used for classification of protein or gene sequences to families.
 
+https://travis-ci.org/ikar1234/PHMM.svg?branch=master
 
 ## Input
 
