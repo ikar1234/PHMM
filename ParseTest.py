@@ -1,5 +1,5 @@
 import unittest
-from HMM.parse import parse
+from PHMM.parse import parse
 
 
 class MyTestCase(unittest.TestCase):

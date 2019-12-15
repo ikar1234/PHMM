@@ -1,5 +1,5 @@
 import unittest
-from HMM.Records import Record
+from PHMM.Records import Record
 import numpy as np
 
 
