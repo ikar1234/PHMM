@@ -1,6 +1,6 @@
 # Profile Hidden Markov Models
 
-I implemented .
+I implemented a Profile Hidden Markov Model (PHMM) in Python, which is used for classification of protein or gene sequences to families.
 
 
 ## Input
