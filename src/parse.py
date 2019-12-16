@@ -115,6 +115,6 @@ def parse(filepath, ftype="fasta", alph='dna') -> Record:
     return record
 
 
-p = "..\\test\\phylip.txt"
+p = "test\\phylip.txt"
 
 parse(p, ftype="phylip")
