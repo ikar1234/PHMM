@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 
-from ..src.Records import Record
+from PHMM.src.Records import Record
 
 
 class MyTestCase(unittest.TestCase):
