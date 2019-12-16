@@ -39,6 +39,8 @@ from PHMM.src.Records import Record
 
 class PHMM():
     record: Record
+    P: np.ndarray
+    Q: np.ndarray
 
     def __init__(self, record):
         """
@@ -47,8 +49,12 @@ class PHMM():
         :param record: record with the position-weight matrix
         """
         self.record = record
+        P = np.array([])
+        Q = np.array([])
+        self.P = P
+        self.Q = Q
 
-    def viterbi(self, seq: str, P, Q):
+    def viterbi(self, seq: str):
         """
         Compute the most probable path of a sequence in
         the HMM using dynamic programming.
@@ -70,12 +76,12 @@ class PHMM():
         for n in range(1, len(seq)):
             for t in range(3):
                 # TODO: log prob
-                last_column = [trellis[n - 1][i] * P[i][t] for i in range(3)]
+                last_column = [trellis[n - 1][i] * self.P[i][t] for i in range(3)]
                 trellis[n][t] = max(last_column)
                 # TODO: check
                 backpointers[n][t] = np.argmax(last_column)
                 # multiply by emission probabilities
-                trellis[n][t] *= Q[n][t]
+                trellis[n][t] *= self.Q[n][t]
 
         return backpointers
 
