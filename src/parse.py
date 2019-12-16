@@ -5,7 +5,7 @@ alignment or importing it as a file.
 """
 import numpy as np
 import re
-from PHMM.src.Records import Record
+from src.Records import Record
 from typing import List
 from collections import Counter
 from operator import itemgetter
