@@ -1,6 +1,6 @@
 import unittest
 
-from PHMM.src.parse import parse
+from ..src.parse import parse
 
 
 class MyTestCase(unittest.TestCase):
