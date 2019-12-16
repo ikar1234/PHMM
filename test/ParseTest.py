@@ -1,6 +1,6 @@
 import unittest
 
-from src.parse import parse
+from PHMM.src.parse import parse
 
 
 class MyTestCase(unittest.TestCase):
@@ -8,7 +8,7 @@ class MyTestCase(unittest.TestCase):
         """
         Test that the alphabet length from the meta data is consistent with the dimension of the matrix.
         """
-        p = "C:\\Users\\user\\PycharmProjects\\Helloadvanced\\HMM\\MA0466.1.meme"
+        p = "..\\test\\MA0466.1.meme"
         rec = parse(p, ftype="meme")
         # length of sequence
         w = rec.meta.get("w",0)
@@ -20,7 +20,7 @@ class MyTestCase(unittest.TestCase):
         """
         Test that the sequence length from the meta data is consistent with the dimension of the matrix
         """
-        p = "C:\\Users\\user\\PycharmProjects\\Helloadvanced\\HMM\\MA0466.1.meme"
+        p = "..\\test\\MA0466.1.meme"
         rec = parse(p, ftype="meme")
         # length of alphabet
         alength = rec.meta.get("alength", 0)

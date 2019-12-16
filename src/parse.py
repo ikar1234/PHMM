@@ -5,7 +5,7 @@ alignment or importing it as a file.
 """
 import numpy as np
 import re
-from HMM.Records import Record
+from PHMM.src.Records import Record
 from typing import List
 from collections import Counter
 from operator import itemgetter
@@ -115,6 +115,6 @@ def parse(filepath, ftype="fasta", alph='dna') -> Record:
     return record
 
 
-p = "C:\\Users\\user\\PycharmProjects\\Helloadvanced\\HMM\\phylip.txt"
+p = "..\\test\\phylip.txt"
 
 parse(p, ftype="phylip")
