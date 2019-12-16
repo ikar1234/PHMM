@@ -32,3 +32,60 @@ Zeichen, die zu einem Insert-Zustand geh¨oren, werden in neuen Spalten aufgenom
 mit Gaps gefullt werden (außer sie enthalten an dieser Stelle auch Insertionen). Deletionszust¨ande fuhren zu Gaps
 in der Sequenz beim Alignieren mit den anderen Sequenzen an den entsprechenden Match-Positionen.
 """
+import numpy as np
+
+from PHMM.src.Records import Record
+
+
+class PHMM():
+    record: Record
+
+    def __init__(self, record):
+        """
+        Construct the transition and emission probability matrices,
+        which are the main parameters of the model.
+        :param record: record with the position-weight matrix
+        """
+        self.record = record
+
+    def viterbi(self, seq: str, P, Q):
+        """
+        Compute the most probable path of a sequence in
+        the HMM using dynamic programming.
+        The run-time of algorithm is O(|Q|^2*n),  where |Q| is the number of
+        emission-states.
+        @:param seq: input sequence
+        @:param P: transition probability matrix
+        @:param Q: emission probability matrix
+        :return: most probable path and the probability of it
+        """
+        # we have 3 states - insert,match,delete
+        trellis = np.zeros((3, len(seq)))
+        # in order to obtain the sequence itself
+        backpointers = np.zeros((3, len(seq)))
+        # initialize
+        for t in range(3):
+            trellis[0][t] = ...
+        # since we have only 3 states, the run-time os O(n)
+        for n in range(1, len(seq)):
+            for t in range(3):
+                # TODO: log prob
+                last_column = [trellis[n - 1][i] * P[i][t] for i in range(3)]
+                trellis[n][t] = max(last_column)
+                # TODO: check
+                backpointers[n][t] = np.argmax(last_column)
+                # multiply by emission probabilities
+                trellis[n][t] *= Q[n][t]
+
+        return backpointers
+
+    def train(self, method="baum_welch"):
+        """
+        Produces a multiple sequence alignment from a set
+        of sequences.
+        :param method: Training method. Most common is the
+        Baum-Welch algorithm.
+        :return:
+        """
+        if method not in ['mle', 'viterbi', 'baum_welch']:
+            raise ValueError("Parameter 'method' must be one of 'mle','viterbi','baum_welch'. ")
