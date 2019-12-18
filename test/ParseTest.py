@@ -1,17 +1,21 @@
 import unittest
 
-from src.parse import parse
+from PHMM.src.parse import parse
+# use this for Travis
+# from src.parse import parse
 
 
 class MyTestCase(unittest.TestCase):
+    path = "test\\MA0466.1.meme"
+
     def test_meta_alength(self):
         """
         Test that the alphabet length from the meta data is consistent with the dimension of the matrix.
         """
-        p = "test\\MA0466.1.meme"
+        p = MyTestCase.path
         rec = parse(p, ftype="meme")
         # length of sequence
-        w = rec.meta.get("w",0)
+        w = rec.meta.get("w", 0)
         l = rec.matrix.shape[1]
 
         self.assertEqual(w, l)
@@ -20,7 +24,7 @@ class MyTestCase(unittest.TestCase):
         """
         Test that the sequence length from the meta data is consistent with the dimension of the matrix
         """
-        p = "test\\MA0466.1.meme"
+        p = MyTestCase.path
         rec = parse(p, ftype="meme")
         # length of alphabet
         alength = rec.meta.get("alength", 0)
