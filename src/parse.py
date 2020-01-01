@@ -5,7 +5,7 @@ alignment or importing it as a file.
 """
 import numpy as np
 import re
-from src.Records import Record
+from .Records import Record
 from typing import List
 from collections import Counter
 from operator import itemgetter
@@ -48,7 +48,7 @@ def create_pwm(file: List[str], ftype: str, alph: str) -> Record:
                 c[a] = 0
         c = sorted(c.items(), key=itemgetter(0))
         # fill matrix column-wise
-        matrix[:, i] = np.array([x[1] for x in c])/n_seq
+        matrix[:, i] = np.array([x[1] for x in c]) / n_seq
     # add number of sequences, alphabet length and sequence length
     meta = {'alength': alength, 'nsites': n_seq, 'E': 0}
     # use first sequence for name
