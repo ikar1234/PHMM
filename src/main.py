@@ -34,29 +34,49 @@ class PHMM():
         al = "A C D E F G H I K L M N P Q R S T V W Y".split(' ')
         return np.sum([np.log(m[al.index(seq[i]), i]) for i in range(len(seq))])[0]
 
-    def forward(self, q: str, i: int) -> float:
+    def forward(self, seqs: List[str]) -> np.ndarray:
+        """
+        Compute the forward probabilities for every sequence and store them in a matrix.
+        :param seqs: List of sequences
+        :return: matrix of forward probabilities
+        """
+        if self.P is None or self.Q is None:
+            raise ValueError("State path must be known.")
+        alpha = np.zeros((len(seqs), self.P.shape[0]))
+        # initial distribution - we are at the starting state
+        init_distr = np.array([1, 0, 0, 0])
+        alpha[0, :] = init_distr * self.Q[:, V[0]]
+
+        for t in range(1, V.shape[0]):
+            for j in range(self.P.shape[0]):
+                alpha[t, j] = alpha[t - 1].dot(self.P[:, j]) * self.Q[j, V[t]]
+
+        return alpha
+
+    def backward(self, seqs: List[str]) -> np.ndarray:
+        """
+        Compute the backward probabilities for every sequence and store them in a matrix.
+        :param seqs: List of sequences
+        :return: matrix of backward probabilities
         """
 
-        :param q: state (one of I,M,D)
-        :param i:
-        :return:
-        """
-        if self.P is None:
+        if self.P is None or self.Q is None:
             raise ValueError("State path must be known.")
 
-    def backward(self, q: str, i: int) -> float:
-        """
+        beta = np.zeros((V.shape[0], a.shape[0]))
 
-        :param q: state (one of I,M,D)
-        :param i:
-        :return:
-        """
+        # setting beta(T) = 1
+        beta[V.shape[0] - 1] = np.ones((a.shape[0]))
 
-        if self.P is None:
-            raise ValueError("State path must be known.")
+        # Loop in backward way from T-1 to
+        # Due to python indexing the actual loop will be T-2 to 0
+        for t in range(V.shape[0] - 2, -1, -1):
+            for j in range(a.shape[0]):
+                beta[t, j] = (beta[t + 1] * b[:, V[t + 1]]).dot(a[j, :])
+
+        return beta
 
     def viterbi_decoding(self, seq: str):
-        # TODO: use log?
         """
         Compute the most probable path of a sequence in
         the HMM using dynamic programming.
@@ -93,69 +113,99 @@ class PHMM():
         :param seqs:
         :return:
         """
-        # paths of states (match, insert, delete) for every sequence
-        paths = [self.viterbi(seq) for seq in seqs]
+        # paths of states (insert=0, match=1, delete=2) for every sequence
+        paths = [self.viterbi_decoding(seq) for seq in seqs]
         for p in range(len(seqs)):
-            yield
+            # TODO: insert states
+            yield ''.join([seqs[p][i] if paths[i] < 2 else "-" for i in range(len(seqs[p]))])
 
-    def train(self, seqs: List[str], method="baum_welch", n_iter=1000) -> str:
+    def baum_welch(self, seqs: List[str], n_iter=1000, tol=1e-3):
+        """
+        Baum-Welch training.
+        :param seqs:
+        :param n_iter: number of iterations for the Baum-Welch algorithm
+        :param tol: tolerance for the matrix norm
+        :return: estimated matrices P and Q
+        """
+        # we initialize P and Q to be random Markov matrices
+        self.P = np.random.rand(self.P.shape[0], self.P.shape[1])
+        self.Q = np.random.rand(self.Q.shape[0], self.P.shape[1])
+        # normalize (divide by the column sums and transpose)
+        self.P = PHMM._normalize(self.P)
+        self.Q = PHMM._normalize(self.Q)
+
+        a = self.P
+        b = self.Q
+
+        for n in range(n_iter):
+            # TODO:  matrices of forward and backward probabilities
+
+            # E-step
+            alpha: np.ndarray = ...  # self.forward()
+            beta: np.ndarray = ...  # self.backward()
+
+            # M-step
+
+            xi = np.zeros((M, M, T - 1))
+            for t in range(T - 1):
+                denominator = np.dot(np.dot(alpha[t, :].T, a) * b[:, V[t + 1]].T, beta[t + 1, :])
+                for i in range(M):
+                    numerator = alpha[t, i] * a[i, :] * b[:, V[t + 1]].T * beta[t + 1, :].T
+                    xi[i, :, t] = numerator / denominator
+
+            gamma = np.sum(xi, axis=1)
+            a = np.sum(xi, 2) / np.sum(gamma, axis=1).reshape((-1, 1))
+
+            gamma = np.hstack((gamma, np.sum(xi[:, :, T - 2], axis=0).reshape((-1, 1))))
+
+            K = b.shape[1]
+            denominator = np.sum(gamma, axis=1)
+            for l in range(K):
+                b[:, l] = np.sum(gamma[:, V == l], axis=1)
+
+            b = np.divide(b, denominator.reshape((-1, 1)))
+
+            # break if the change in the matrices is not substantial
+            p_norm_diff = np.abs(np.linalg.norm(a) - np.linalg.norm(a))
+            q_norm_diff = np.abs(np.linalg.norm(b) - np.linalg.norm(b))
+            if p_norm_diff < tol and q_norm_diff < tol:
+                break
+
+        self.P = a
+        self.Q = b
+
+    def train(self, seqs: List[str], method="baum_welch", n_iter=1000, tol=1e-3) -> str:
         """
         Produces a multiple sequence alignment from a set
         of sequences.
         :param method: Training method. Most common is the
         Baum-Welch algorithm.
         :param n_iter: number of iterations for the Baum-Welch algorithm
+        :param tol: tolerance for the matrix norm
         :return: multiple sequence alignment
         """
         # Viterbi-Training - uses the Viterbi algorithm for every input sequence and
         # aligns the sequence using the generated observed states.
         if method == 'viterbi':
             if self.P is None and self.Q is None:
-                warn("Viterbi training cannot be used if the state path is unknown.\n"
-                     "Use 'baum-welch' instead.")
-                return ""
-            return self.viterbi_training(seqs)
-            # multiple sequence alignment
-            msa = '\n'.join(path_seqs)
-
-            return msa
+                raise ValueError("Viterbi training cannot be used if the state path is unknown.\n"
+                                 "Use 'baum-welch' instead.")
         # Baum-Welch is used when the state path is unknown.
         elif method == 'baum_welch':
             if self.P is not None and self.Q is not None:
                 warn("Baum-Welch assumes that the state path is unknown, but a profile was given.\n"
                      "The profile will be ignored. Use 'viterbi' if you want to use the profile.")
-
-            # we initialize P and Q to be random Markov matrices
-            self.P = np.random.rand(self.P.shape[0], self.P.shape[1])
-            self.Q = np.random.rand(self.Q.shape[0], self.P.shape[1])
-            # normalize (divide by the column sums and transpose)
-            self.P = (self.P / np.sum(self.P, axis=0)).T
-            self.Q = (self.Q / np.sum(self.Q, axis=0)).T
-
-            for n in range(n_iter):
-                alpha = ...  # self.forward(V, a, b)
-                beta = ...  # self.backward(V, a, b)
-
-                xi = np.zeros((M, M, T - 1))
-                for t in range(T - 1):
-                    denominator = np.dot(np.dot(alpha[t, :].T, a) * b[:, V[t + 1]].T, beta[t + 1, :])
-                    for i in range(M):
-                        numerator = alpha[t, i] * a[i, :] * b[:, V[t + 1]].T * beta[t + 1, :].T
-                        xi[i, :, t] = numerator / denominator
-
-                gamma = np.sum(xi, axis=1)
-                a = np.sum(xi, 2) / np.sum(gamma, axis=1).reshape((-1, 1))
-
-                # Add additional T'th element in gamma
-                gamma = np.hstack((gamma, np.sum(xi[:, :, T - 2], axis=0).reshape((-1, 1))))
-
-                K = b.shape[1]
-                denominator = np.sum(gamma, axis=1)
-                for l in range(K):
-                    b[:, l] = np.sum(gamma[:, V == l], axis=1)
-
-                b = np.divide(b, denominator.reshape((-1, 1)))
-
-            ...
+            self.baum_welch(seqs)
         else:
             raise ValueError("Parameter 'method' must be either 'viterbi' or 'baum_welch'.")
+
+        paths = self.viterbi_training(seqs)
+        return '\n'.join(paths)
+
+    @staticmethod
+    def _normalize(m: np.ndarray):
+        """
+        Normalize a matrix such that each row sums up to 1.
+        """
+
+        return (m / np.sum(m, axis=0)).T
