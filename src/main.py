@@ -115,22 +115,27 @@ class PHMM:
         @:param Q: emission probability matrix
         :return: most probable path and the probability of it
         """
-        # we have 3 states - insert,match,delete
+        # we have 3 states - match,insert,delete
         trellis = np.zeros((3, len(seq)))
         # in order to obtain the sequence itself
-        backpointers = np.zeros((3, len(seq)))
+        backpointers = np.zeros((3, len(seq)), dtype=np.int)
         # initialize
         trellis[:, 0] = np.array([1, 0, 0])
 
         # since we have only 3 states, the run-time is O(n)
-        for t in range(3):
-            for n in range(1, len(seq)):
+        for n in range(1, len(seq)):
+            for t in range(3):
+                last_column = [trellis[:, n - 1] * self.P[t, :]]
                 # TODO: log prob
-                last_column = [trellis[i, n - 1] * self.P[t, i] for i in range(3)]
-                trellis[t, n] = max(last_column)
-                # TODO: check
+                ind = self.alph.index(seq[n])
+                trellis[t, n] = self.Q[t, ind] * np.max(last_column)
                 backpointers[t, n] = np.argmax(last_column)
-        return backpointers
+        last = np.argmax(trellis[:, len(seq) - 1])
+
+        yield last
+        for i in range(len(seq) - 2, 1, -1):
+            yield backpointers[last, i]
+            last = backpointers[last, i]
 
     def viterbi_training(self, seqs: List[str]):
         """
@@ -139,10 +144,12 @@ class PHMM:
         :return:
         """
         # paths of states (insert=0, match=1, delete=2) for every sequence
-        paths = [self.viterbi_decoding(seq) for seq in seqs]
-        for p in range(len(seqs)):
-            # TODO: insert states
-            yield ''.join([seqs[p][i] if paths[i] < 2 else "-" for i in range(len(seqs[p]))])
+        paths = [list(self.viterbi_decoding(seq)) for seq in seqs]
+
+        # for p in range(len(seqs)):
+        #     TODO: insert states
+        # yield ''.join([seqs[p][i] if paths[i] < 2 else "-" for i in range(len(seqs[p]))])
+        return paths
 
     def _forward(self, seq: str) -> np.ndarray:
         """
@@ -211,7 +218,7 @@ class PHMM:
         for s in seqs:
             yield self._backward(s)
 
-    def baum_welch(self, seqs: List[str], n_iter: int = 1000):
+    def baum_welch(self, seqs: List[str], n_iter: int = 400):
         """
         Baum-Welch algorithm to estimate the parameters of the HMM.
         :param seqs: list of sequences
@@ -222,11 +229,17 @@ class PHMM:
         # mean length of the sequences
         l = int(np.mean([len(x) for x in seqs]))
 
+        # number of training sequences
+        n_seq = len(seqs)
+
         self.P = np.random.rand(3, 3)
         self.Q = np.random.rand(3, l)
 
         P_hat = self.P
         Q_hat = self.Q
+
+        print(self.P)
+        print(self.Q)
 
         for i in range(n_iter):
             # forward probabilities for each sequence
@@ -237,16 +250,21 @@ class PHMM:
             for k in range(3):
                 for l in range(3):
                     P_hat[k, l] = \
-                        np.sum([1 / np.sum([fwd[j][:, l]] * self.P[k, 0])
-                                for j in range(len(seqs))])
+                        np.sum([1 / self.obs_prob(seqs[j]) *
+                                sum([fwd[j][k, i] * self.P[k, l] * self.Q[
+                                    l, self.alph.index(seqs[j][i])] * bwd[j][l, i + 1] for i in
+                                     range(len(seqs[j]) - 1)]) for j in
+                                range(n_seq)])
                 for b in range(len(self.alph)):
                     Q_hat[k, b] = sum(
-                        [1 / np.sum([fwd[j][:, l]]) * sum(
-                            [fwd[j][k][i] * bwd[j][l][i] for i in range(len(seqs[j])) if seqs[j][i] == b])
-                         for j in range(len(seqs))])
+                        [1 / self.obs_prob(seqs[j]) * sum(
+                            [fwd[j][k, i] * bwd[j][l, i] for i in range(len(seqs[j])) if seqs[j][i] == self.alph[b]])
+                         for j in range(n_seq)])
 
             self.P = self._normalize(P_hat)
             self.Q = self._normalize(Q_hat, cols=True)
+        print(self.P)
+        print(self.Q)
 
     def train(self, seqs: List[str], method="baum_welch") -> str:
         """
@@ -272,9 +290,9 @@ class PHMM:
         else:
             raise ValueError("Parameter 'method' must be either 'viterbi' or 'baum_welch'.")
 
-        paths = list(self.viterbi_training(seqs))
+        paths = self.viterbi_training(seqs)
 
-        return '\n'.join(paths)
+        return paths
 
     @classmethod
     def compare(cls, cls1, cls2, seq: str, verbose: bool = False):
