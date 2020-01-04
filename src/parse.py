@@ -58,16 +58,14 @@ def create_pwm(file: List[str], ftype: str, alph: str) -> Record:
 
 
 # TODO: some matrices come normalized, other unnormalized
-def parse(filepath, ftype="fasta", alph='dna') -> Record:
+def parse(filepath, ftype, alph='dna') -> Record:
     """
     :param filepath: Path to file
     :param ftype: File type
     :return: Name of motif/etc. and an un/normalized count matrix
     """
     if ftype.upper() not in ['PHYLIP', 'JASPAR', 'MEME']:
-        print(f"Input should be one of the following types: PHYLIP, ")
-        record = Record()
-        return record
+        raise ValueError(f"Input should be one of the following types: PHYLIP, JASPAR, MEME")
 
     with open(filepath, "r") as f:
         file = f.readlines()
@@ -113,8 +111,3 @@ def parse(filepath, ftype="fasta", alph='dna') -> Record:
         record = create_pwm(file, ftype=ftype.upper(), alph=alph)
 
     return record
-
-
-p = "test\\phylip.txt"
-
-parse(p, ftype="phylip")

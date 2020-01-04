@@ -5,76 +5,104 @@ from warnings import warn
 from PHMM.src.Records import Record
 
 
-class PHMM():
+class PHMM:
     record: Record
     # transition probability matrix
     P: np.ndarray
     # emission probability matrix
     Q: np.ndarray
+    # initial probabilities
+    states: List[int]
+    # alphabet
+    alph: List[str]
+    # length of the model
+    l: int
 
-    def __init__(self, record=None):
+    def __init__(self, record=None, alph="dna"):
         """
         Construct the transition and emission probability matrices,
         which are the main parameters of the model.
         :param record: record with the position-weight matrix
         """
-        self.record = record
-        self.P = record.matrix  # TODO:?
-        self.Q = record.matrix
+        if record is not None:
+            self.record = record
+            self._annotate()
+            # infer from the record
+            if alph == "dna" or self.record.meta.get('alength', 20) == 4:
+                self.alph = "A C G T".split(' ')
+            else:
+                self.alph = "A C D E F G H I K L M N P Q R S T V W Y".split(' ')
+            self.P = self.mle_P()
+            self.Q = self.mle_Q()
+        else:
+            self.record = None
+            self.P = None
+            self.Q = None
+            self.states = None
+            self.alph = "A C G T".split(' ')
 
-    def evaluate(self, seq: str) -> float:
+    def _annotate(self):
+        """
+        Infer the matching and inserting states
+        from the alignment  by counting the number of gaps.
+        :return: list of states (M=0,I=1,D=2)
+        """
+        # if there are exactly 0 gaps, the state is matching
+        # if the gaps are <50%, the state is matching (=0)
+        # else the state is inserting (=1)
+
+        gaps_func = lambda x: 0 if x <= 0.5 else 1
+        self.states = [gaps_func(x) for x in self.record.matrix[-1, :]]
+
+    def mle_P(self) -> np.ndarray:
+        """
+        Maximum likelihood estimator for the transition matrix.
+        :return:
+        """
+        # estimate number of transitions from every state to
+        # every other state from the matrix
+
+        P_hat = np.zeros((3, 3))
+
+        st = self.states
+        l = len(st)
+        for i in range(l - 1):
+            P_hat[st[i], st[i + 1]] += 1
+
+        P_hat = self._normalize(P_hat, pseudo=True)
+
+        return P_hat
+
+    def mle_Q(self) -> np.ndarray:
+        """
+        Maximum likelihood estimator for the emission matrix.
+        :return:
+        """
+        # count the number of emissions
+
+        Q_hat = np.zeros((3, len(self.alph)))
+
+        # normalize the columns
+        Q_hat = self._normalize(Q_hat, cols=True, pseudo=True)
+
+        return Q_hat
+
+    def evaluate(self, seq: str, log: bool = False) -> float:
         """
         Given an observation sequence and a model, find the likelihood of the sequence with respect to the model.
         This value can be estimated from the profile itself.
         :param seq: sequence
-        :return: log-likelihood of the sequence with respect to the model
+        :param log: take the log likelihood. This could also result in the likelihoood being -inf.
+        :return: (log-)likelihood of the sequence with respect to the model
         """
         m = self.record.matrix
-        # protein alphabet, characters in the same order as the PWM
-        al = "A C D E F G H I K L M N P Q R S T V W Y".split(' ')
-        return np.sum([np.log(m[al.index(seq[i]), i]) for i in range(len(seq))])[0]
-
-    def forward(self, seqs: List[str]) -> np.ndarray:
-        """
-        Compute the forward probabilities for every sequence and store them in a matrix.
-        :param seqs: List of sequences
-        :return: matrix of forward probabilities
-        """
-        if self.P is None or self.Q is None:
-            raise ValueError("State path must be known.")
-        alpha = np.zeros((len(seqs), self.P.shape[0]))
-        # initial distribution - we are at the starting state
-        init_distr = np.array([1, 0, 0, 0])
-        alpha[0, :] = init_distr * self.Q[:, V[0]]
-
-        for t in range(1, V.shape[0]):
-            for j in range(self.P.shape[0]):
-                alpha[t, j] = alpha[t - 1].dot(self.P[:, j]) * self.Q[j, V[t]]
-
-        return alpha
-
-    def backward(self, seqs: List[str]) -> np.ndarray:
-        """
-        Compute the backward probabilities for every sequence and store them in a matrix.
-        :param seqs: List of sequences
-        :return: matrix of backward probabilities
-        """
-
-        if self.P is None or self.Q is None:
-            raise ValueError("State path must be known.")
-
-        beta = np.zeros((V.shape[0], a.shape[0]))
-
-        # setting beta(T) = 1
-        beta[V.shape[0] - 1] = np.ones((a.shape[0]))
-
-        # Loop in backward way from T-1 to
-        # Due to python indexing the actual loop will be T-2 to 0
-        for t in range(V.shape[0] - 2, -1, -1):
-            for j in range(a.shape[0]):
-                beta[t, j] = (beta[t + 1] * b[:, V[t + 1]]).dot(a[j, :])
-
-        return beta
+        # protein/dna alphabet, characters in the same order as the PWM
+        if log:
+            with np.errstate(divide='ignore'):
+                lhd = np.sum([np.log(m[self.alph.index(seq[i]), i]) for i in range(len(seq))])
+        else:
+            lhd = np.product([m[self.alph.index(seq[i]), i] for i in range(len(seq))])
+        return lhd
 
     def viterbi_decoding(self, seq: str):
         """
@@ -92,19 +120,16 @@ class PHMM():
         # in order to obtain the sequence itself
         backpointers = np.zeros((3, len(seq)))
         # initialize
-        for t in range(3):
-            trellis[0][t] = ...
-        # since we have only 3 states, the run-time os O(n)
-        for n in range(1, len(seq)):
-            for t in range(3):
-                # TODO: log prob
-                last_column = [trellis[n - 1][i] * self.P[i][t] for i in range(3)]
-                trellis[n][t] = max(last_column)
-                # TODO: check
-                backpointers[n][t] = np.argmax(last_column)
-                # multiply by emission probabilities
-                trellis[n][t] *= self.Q[n][t]
+        trellis[:, 0] = np.array([1, 0, 0])
 
+        # since we have only 3 states, the run-time is O(n)
+        for t in range(3):
+            for n in range(1, len(seq)):
+                # TODO: log prob
+                last_column = [trellis[i, n - 1] * self.P[t, i] for i in range(3)]
+                trellis[t, n] = max(last_column)
+                # TODO: check
+                backpointers[t, n] = np.argmax(last_column)
         return backpointers
 
     def viterbi_training(self, seqs: List[str]):
@@ -119,69 +144,117 @@ class PHMM():
             # TODO: insert states
             yield ''.join([seqs[p][i] if paths[i] < 2 else "-" for i in range(len(seqs[p]))])
 
-    def baum_welch(self, seqs: List[str], n_iter=1000, tol=1e-3):
+    def _forward(self, seq: str) -> np.ndarray:
         """
-        Baum-Welch training.
-        :param seqs:
-        :param n_iter: number of iterations for the Baum-Welch algorithm
-        :param tol: tolerance for the matrix norm
-        :return: estimated matrices P and Q
+        Forward algorithm.
+        :param seq:
+        :return: Probability that the prefix
+        sequence of symbols is generated and the system is in
+        state k at time i.
         """
-        # we initialize P and Q to be random Markov matrices
-        self.P = np.random.rand(self.P.shape[0], self.P.shape[1])
-        self.Q = np.random.rand(self.Q.shape[0], self.P.shape[1])
-        # normalize (divide by the column sums and transpose)
-        self.P = PHMM._normalize(self.P)
-        self.Q = PHMM._normalize(self.Q)
+        if self.P is None or self.Q is None:
+            raise ValueError("This algorithm is not applicable if both matrices are unknown.")
 
-        a = self.P
-        b = self.Q
+        # number of states
+        n = self.P.shape[0]
+        l = len(seq)
 
-        for n in range(n_iter):
-            # TODO:  matrices of forward and backward probabilities
+        fwd = np.zeros((n, l), dtype=np.float)
+        fwd[0, 0] = 1
 
-            # E-step
-            alpha: np.ndarray = ...  # self.forward()
-            beta: np.ndarray = ...  # self.backward()
+        for i in range(1, l):
+            for st in range(n):
+                letter = self.alph.index(seq[i])
+                fwd[st, i] = self.Q[st, letter] * np.dot(fwd[:, i - 1], self.P[:, st])
 
-            # M-step
+        return fwd
 
-            xi = np.zeros((M, M, T - 1))
-            for t in range(T - 1):
-                denominator = np.dot(np.dot(alpha[t, :].T, a) * b[:, V[t + 1]].T, beta[t + 1, :])
-                for i in range(M):
-                    numerator = alpha[t, i] * a[i, :] * b[:, V[t + 1]].T * beta[t + 1, :].T
-                    xi[i, :, t] = numerator / denominator
+    def _backward(self, seq: str) -> np.ndarray:
+        """
+        Backward algorithm.
+        :param seq:
+        :return: Probability that the prefix sequence of symbols
+        starts in state k at time i and then generates the
+        sequence of symbols x_{i+1}..x_L .
+        """
+        if self.P is None or self.Q is None:
+            raise ValueError("This algorithm is not applicable if both matrices are unknown.")
+        # number of states
+        n = self.P.shape[0]
+        l = len(seq)
+        bwd = np.zeros((n, l))
 
-            gamma = np.sum(xi, axis=1)
-            a = np.sum(xi, 2) / np.sum(gamma, axis=1).reshape((-1, 1))
+        # initialize
+        bwd[:, l - 1] = self.P[:, 0]
 
-            gamma = np.hstack((gamma, np.sum(xi[:, :, T - 2], axis=0).reshape((-1, 1))))
+        for i in range(l - 2, 1, -1):
+            for k in range(n):
+                # What if l > len(seq)?
+                letter = self.alph.index(seq[i + 1])
+                bwd[k, i] = np.sum(self.P[k, :] * self.Q[:, letter] * bwd[:, i + 1])
 
-            K = b.shape[1]
-            denominator = np.sum(gamma, axis=1)
-            for l in range(K):
-                b[:, l] = np.sum(gamma[:, V == l], axis=1)
+        return bwd
 
-            b = np.divide(b, denominator.reshape((-1, 1)))
+    def obs_prob(self, seq):
+        """
+        Probability that the sequence is generated from the PHMM.
+        We use the forward algorithm to compute that.
+        :param seq: sequence
+        """
+        return np.sum(self._forward(seq)[:, -1])
 
-            # break if the change in the matrices is not substantial
-            p_norm_diff = np.abs(np.linalg.norm(a) - np.linalg.norm(a))
-            q_norm_diff = np.abs(np.linalg.norm(b) - np.linalg.norm(b))
-            if p_norm_diff < tol and q_norm_diff < tol:
-                break
+    def _forwards(self, seqs: List[str], l: int):
+        for s in seqs:
+            yield self._forward(s)
 
-        self.P = a
-        self.Q = b
+    def _backwards(self, seqs: List[str], l: int):
+        for s in seqs:
+            yield self._backward(s)
 
-    def train(self, seqs: List[str], method="baum_welch", n_iter=1000, tol=1e-3) -> str:
+    def baum_welch(self, seqs: List[str], n_iter: int = 1000):
+        """
+        Baum-Welch algorithm to estimate the parameters of the HMM.
+        :param seqs: list of sequences
+        :param n_iter: number of iterations
+        :return:
+        """
+
+        # mean length of the sequences
+        l = int(np.mean([len(x) for x in seqs]))
+
+        self.P = np.random.rand(3, 3)
+        self.Q = np.random.rand(3, l)
+
+        P_hat = self.P
+        Q_hat = self.Q
+
+        for i in range(n_iter):
+            # forward probabilities for each sequence
+            fwd = list(self._forwards(seqs, l))
+            # backward probabilities for each sequence
+            bwd = list(self._backwards(seqs, l))
+
+            for k in range(3):
+                for l in range(3):
+                    P_hat[k, l] = \
+                        np.sum([1 / np.sum([fwd[j][:, l]] * self.P[k, 0])
+                                for j in range(len(seqs))])
+                for b in range(len(self.alph)):
+                    Q_hat[k, b] = sum(
+                        [1 / np.sum([fwd[j][:, l]]) * sum(
+                            [fwd[j][k][i] * bwd[j][l][i] for i in range(len(seqs[j])) if seqs[j][i] == b])
+                         for j in range(len(seqs))])
+
+            self.P = self._normalize(P_hat)
+            self.Q = self._normalize(Q_hat, cols=True)
+
+    def train(self, seqs: List[str], method="baum_welch") -> str:
         """
         Produces a multiple sequence alignment from a set
         of sequences.
         :param method: Training method. Most common is the
         Baum-Welch algorithm.
-        :param n_iter: number of iterations for the Baum-Welch algorithm
-        :param tol: tolerance for the matrix norm
+        :param seqs: List of sequences
         :return: multiple sequence alignment
         """
         # Viterbi-Training - uses the Viterbi algorithm for every input sequence and
@@ -199,13 +272,53 @@ class PHMM():
         else:
             raise ValueError("Parameter 'method' must be either 'viterbi' or 'baum_welch'.")
 
-        paths = self.viterbi_training(seqs)
+        paths = list(self.viterbi_training(seqs))
+
         return '\n'.join(paths)
 
-    @staticmethod
-    def _normalize(m: np.ndarray):
-        """
-        Normalize a matrix such that each row sums up to 1.
+    @classmethod
+    def compare(cls, cls1, cls2, seq: str, verbose: bool = False):
         """
 
-        return (m / np.sum(m, axis=0)).T
+        :param cls1:
+        :param cls2:
+        :param seq:
+        :return:
+        """
+        if not isinstance(cls2, PHMM):
+            raise ValueError("The second argument must be a PHMM.")
+        ratio = cls.obs_prob(cls1, seq) / cls.obs_prob(cls2, seq)
+        if ratio > 1:
+            if verbose:
+                print(f'The first PHMM is better than the second '
+                      f'with ratio {ratio}')
+        elif ratio == 1:
+            if verbose:
+                print(f'Both PHMM are equally well.')
+        else:
+            if verbose:
+                print(f'The second PHMM is better than the first '
+                      f'with ratio {1 / ratio}')
+        return ratio
+
+    @staticmethod
+    def _normalize(m: np.ndarray, cols=False, pseudo=True):
+        # TODO: Laplace rule
+        """
+        Normalize a matrix such that each row sums up to 1.
+        @:param cols: normalize the columns instead
+        @:param pseudo: add pseudocounts
+        """
+        if cols:
+            if pseudo:
+                return (m + 1) / (np.sum(m, axis=0) + m.shape[0])
+            else:
+                return m / np.sum(m, axis=0)
+        else:
+            # use broadcasting
+            row_sums = m.sum(axis=1)
+            if pseudo:
+                new_matrix = (m + 1) / (row_sums[:, None] + m.shape[1])
+            else:
+                new_matrix = m / row_sums[:, None]
+            return new_matrix
