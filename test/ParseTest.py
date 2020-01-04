@@ -1,12 +1,16 @@
 import unittest
 
 from PHMM.src.parse import parse
+
+
 # use this for Travis
 # from src.parse import parse
 
 
 class MyTestCase(unittest.TestCase):
-    path = "test\\MA0466.1.meme"
+    path = "MA0466.1.meme"
+    ungapped = "ungapped.txt"
+    plain = "plain.txt"
 
     def test_meta_alength(self):
         """
@@ -31,6 +35,15 @@ class MyTestCase(unittest.TestCase):
         a = rec.matrix.shape[0]
 
         self.assertEqual(alength, a)
+
+    def test_plain(self):
+        rec = parse(MyTestCase.plain, ftype="txt")
+
+        print(rec.matrix)
+
+    def test_ungapped(self):
+        rec = parse(MyTestCase.ungapped, ftype="txt")
+        print(rec.matrix)
 
 
 if __name__ == '__main__':

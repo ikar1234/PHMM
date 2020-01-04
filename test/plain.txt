@@ -1,0 +1,8 @@
+> Plain sequence alignment
+ACGATC--AC
+ACCATC--AC
+TCCATCA-AC
+TCGATCA-AC
+AC-ATC-TAC
+ACGA-C-TAC
+A-GATC--AC

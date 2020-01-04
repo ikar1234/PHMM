@@ -13,7 +13,7 @@ class MyTestCase(unittest.TestCase):
 
     # without training data
     phmm2 = PHMM()
-    seqs = ["AATCAGACTAA",
+    seqs = ["AATAGACTAA",
             "ACGATCAGACT",
             "CCCATCAAACT",
             "ACGATCACTCT"]
@@ -30,21 +30,11 @@ class MyTestCase(unittest.TestCase):
 
     def test_viterbi_decoding(self):
         b = MyTestCase.phmm.viterbi_decoding("ATTGACGTACGTAAT")
-        print(list(b))
 
-    # def test_baum_welch(self):
-    #     msa = MyTestCase.phmm2.train(seqs=MyTestCase.seqs, method='baum_welch')
-    #
-    #     print(msa)
-    #     # the MSA should look like this
-    #     true_msa = "A--ATCAGACT\n" \
-    #                "ACGATCAGACT\n" \
-    #                "CCCATCAAACT\n" \
-    #                "ACGATC--ACT"
-    #     self.assertEquals(msa, true_msa)
-
-    def test_viterbi_training(self):
-        ...
+    def test_baum_welch(self):
+        msa = MyTestCase.phmm.train(seqs=MyTestCase.seqs, method='viterbi')
+        print(MyTestCase.phmm.Q)
+        print(msa)
 
     # def test_compare(self):
     #     seq = "TATTGCACAAT"

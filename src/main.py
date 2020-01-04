@@ -82,6 +82,8 @@ class PHMM:
 
         Q_hat = np.zeros((3, len(self.alph)))
 
+        st = self.states
+
         # normalize the columns
         Q_hat = self._normalize(Q_hat, cols=True, pseudo=True)
 
@@ -115,41 +117,52 @@ class PHMM:
         @:param Q: emission probability matrix
         :return: most probable path and the probability of it
         """
+        l_seq = len(seq)
         # we have 3 states - match,insert,delete
-        trellis = np.zeros((3, len(seq)))
+        trellis = np.zeros((3, l_seq))
         # in order to obtain the sequence itself
-        backpointers = np.zeros((3, len(seq)), dtype=np.int)
+        backpointers = np.zeros((3, l_seq), dtype=np.int)
         # initialize
         trellis[:, 0] = np.array([1, 0, 0])
 
         # since we have only 3 states, the run-time is O(n)
-        for n in range(1, len(seq)):
+        for n in range(1, l_seq):
             for t in range(3):
-                last_column = [trellis[:, n - 1] * self.P[t, :]]
-                # TODO: log prob
+                last_column = trellis[:, n - 1] * self.P[t, :]
                 ind = self.alph.index(seq[n])
                 trellis[t, n] = self.Q[t, ind] * np.max(last_column)
                 backpointers[t, n] = np.argmax(last_column)
-        last = np.argmax(trellis[:, len(seq) - 1])
+        last = np.argmax(trellis[:, l_seq - 1])
 
         yield last
-        for i in range(len(seq) - 2, 1, -1):
+        for i in range(l_seq - 1, 0, -1):
             yield backpointers[last, i]
             last = backpointers[last, i]
 
     def viterbi_training(self, seqs: List[str]):
         """
-        Viterbi training.
+        Train each sequence using the models parameters
+        and concatenate sequences to a multiple alignment.
         :param seqs:
         :return:
         """
         # paths of states (insert=0, match=1, delete=2) for every sequence
         paths = [list(self.viterbi_decoding(seq)) for seq in seqs]
+        print(paths)
 
-        # for p in range(len(seqs)):
-        #     TODO: insert states
-        # yield ''.join([seqs[p][i] if paths[i] < 2 else "-" for i in range(len(seqs[p]))])
-        return paths
+        for s in range(len(seqs)):
+            new_seq = ''
+            for i in range(len(seqs[s])):
+                # if in matching or inserting state
+                if paths[s][i] < 2:
+                    new_seq += seqs[s][i]
+                # if any other state is inserting
+                elif any([paths[other_seq][i] == 2 for other_seq in range(len(seqs))]):
+                    new_seq += '-'
+                # deleting state
+                else:
+                    new_seq += '-'
+            yield new_seq
 
     def _forward(self, seq: str) -> np.ndarray:
         """
@@ -210,11 +223,11 @@ class PHMM:
         """
         return np.sum(self._forward(seq)[:, -1])
 
-    def _forwards(self, seqs: List[str], l: int):
+    def _forwards(self, seqs: List[str]):
         for s in seqs:
             yield self._forward(s)
 
-    def _backwards(self, seqs: List[str], l: int):
+    def _backwards(self, seqs: List[str]):
         for s in seqs:
             yield self._backward(s)
 
@@ -238,14 +251,11 @@ class PHMM:
         P_hat = self.P
         Q_hat = self.Q
 
-        print(self.P)
-        print(self.Q)
-
         for i in range(n_iter):
             # forward probabilities for each sequence
-            fwd = list(self._forwards(seqs, l))
+            fwd = list(self._forwards(seqs))
             # backward probabilities for each sequence
-            bwd = list(self._backwards(seqs, l))
+            bwd = list(self._backwards(seqs))
 
             for k in range(3):
                 for l in range(3):
@@ -263,8 +273,6 @@ class PHMM:
 
             self.P = self._normalize(P_hat)
             self.Q = self._normalize(Q_hat, cols=True)
-        print(self.P)
-        print(self.Q)
 
     def train(self, seqs: List[str], method="baum_welch") -> str:
         """
@@ -290,22 +298,24 @@ class PHMM:
         else:
             raise ValueError("Parameter 'method' must be either 'viterbi' or 'baum_welch'.")
 
-        paths = self.viterbi_training(seqs)
+        new_seqs = list(self.viterbi_training(seqs))
 
-        return paths
+        return '\n'.join(new_seqs)
 
     @classmethod
-    def compare(cls, cls1, cls2, seq: str, verbose: bool = False):
+    def compare(cls, obj1, obj2, seq: str, verbose: bool = False):
         """
-
-        :param cls1:
-        :param cls2:
-        :param seq:
-        :return:
+        Compare two PHMM using the forward algorithm, which computes
+        the probability P(seq | M).
+        :param obj1: first PHMM
+        :param obj2: second PHMM
+        :param seq: sequence
+        :param verbose: output explanation
+        :return: ratio of probabilities
         """
-        if not isinstance(cls2, PHMM):
+        if not isinstance(obj2, PHMM):
             raise ValueError("The second argument must be a PHMM.")
-        ratio = cls.obs_prob(cls1, seq) / cls.obs_prob(cls2, seq)
+        ratio = cls.obs_prob(obj1, seq) / cls.obs_prob(obj2, seq)
         if ratio > 1:
             if verbose:
                 print(f'The first PHMM is better than the second '

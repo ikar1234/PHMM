@@ -1,7 +1,6 @@
 """
 Parsing module to get the frquency matrix (profile), either by constructing it from a multiple
 alignment or importing it as a file.
- TODO: class or function?
 """
 import numpy as np
 import re
@@ -19,29 +18,37 @@ def create_pwm(file: List[str], ftype: str, alph: str) -> Record:
     :param ftype: format of MSA
     :param alph: alphabet
     """
-    # TODO: many alingments in one file?
-    header = file[0].strip().split(' ')
-    n_seq = int(header[0])
-    # extract ids
-    ids = [re.findall('.*? ', file[i])[0] for i in range(1, n_seq + 1)]
-    # iterate through every row i modulo number of sequences and extract the sequence
-    # then remove spaces
-    # do this for every sequence k from 1 to n_seq
-    seq = [re.sub(' ', '', ''.join([re.findall(' (.*)', file[i])[0].strip() for i in range(k, len(file), n_seq + 1)]))
-           for k in range(1, n_seq + 1)]
+    if ftype.upper() == 'PHYLIP':
+        header = file[0].strip().split(' ')
+        n_seq = int(header[0])
+        # extract ids
+        ids = [re.findall('.*? ', file[i])[0] for i in range(1, n_seq + 1)]
+        # iterate through every row i modulo number of sequences and extract the sequence
+        # then remove spaces
+        # do this for every sequence k from 1 to n_seq
+        seq = [
+            re.sub(' ', '', ''.join([re.findall(' (.*)', file[i])[0].strip() for i in range(k, len(file), n_seq + 1)]))
+            for k in range(1, n_seq + 1)]
+    else:
+        seq = file[1:]
+        n_seq = len(file)
+        # for consistency with the other format
+        ids = [seq[0]]
     # TODO: currently, meta data is parsed into MEME format; change?
     # sequence length
     seq_len = len(seq[0])
     if alph.upper().startswith('A'):
         alength = 4
-        al = "A C G T".split(' ')
+        al = "A C G T -".split(' ')
     else:
         # add ? character
-        alength = 21
-        al = "A C D E F G H I K L M N P Q R S T V W Y ?".split(' ')
+        alength = 22
+        al = "A C D E F G H I K L M N P Q R S T V W Y ? -".split(' ')
     matrix = np.zeros((alength, seq_len))
     for i in range(seq_len):
-        c = Counter([s[i] for s in seq])
+        seq = [s.strip() for s in seq]
+        print(seq_len)
+        c = Counter([s.strip()[i] for s in seq])
         # add letters which occur 0 times
         for a in al:
             if c.get(a, 0) == 0:
@@ -64,8 +71,8 @@ def parse(filepath, ftype, alph='dna') -> Record:
     :param ftype: File type
     :return: Name of motif/etc. and an un/normalized count matrix
     """
-    if ftype.upper() not in ['PHYLIP', 'JASPAR', 'MEME']:
-        raise ValueError(f"Input should be one of the following types: PHYLIP, JASPAR, MEME")
+    if ftype.upper() not in ['PHYLIP', 'JASPAR', 'MEME', 'TXT']:
+        raise ValueError(f"Input should be one of the following types: PHYLIP, JASPAR, MEME, txt")
 
     with open(filepath, "r") as f:
         file = f.readlines()
@@ -106,7 +113,7 @@ def parse(filepath, ftype, alph='dna') -> Record:
         matrix = np.array(matrix)
 
         record = Record(name, matrix, ftype="JASPAR")
-    # else: file is in PHYLIP format
+    # else: file is in PHYLIP/txt format
     else:
         record = create_pwm(file, ftype=ftype.upper(), alph=alph)
 
