@@ -1,5 +1,6 @@
 import unittest
 
+from PHMM.src.Records import Record
 from PHMM.src.main import PHMM
 from PHMM.src.parse import parse
 
@@ -29,11 +30,14 @@ class MyTestCase(unittest.TestCase):
         self.assertAlmostEqual(lkh, 0.036, places=3)
 
     def test_viterbi_decoding(self):
-        b = MyTestCase.phmm.viterbi_decoding("ATTGACGTACGTAAT")
+        gapped_phmm = PHMM(parse(filepath='../test/plain.txt', ftype='txt'))
+        b = list(gapped_phmm.viterbi_decoding("ATTGACGTACGTAAT"))
+        print(b)
 
     def test_baum_welch(self):
-        msa = MyTestCase.phmm.train(seqs=MyTestCase.seqs, method='viterbi')
-        print(MyTestCase.phmm.Q)
+        gapped_phmm = PHMM(parse(filepath='../test/plain.txt', ftype='txt'))
+
+        msa = gapped_phmm.train(seqs=MyTestCase.seqs, method='viterbi')
         print(msa)
 
     # def test_compare(self):

@@ -73,19 +73,19 @@ class PHMM:
 
         return P_hat
 
-    def mle_Q(self) -> np.ndarray:
+    def mle_Q(self):
         """
         Maximum likelihood estimator for the emission matrix.
         :return:
         """
         # count the number of emissions
 
-        Q_hat = np.zeros((3, len(self.alph)))
+        # list of list of dictionary objects
 
-        st = self.states
-
-        # normalize the columns
-        Q_hat = self._normalize(Q_hat, cols=True, pseudo=True)
+        Q_hat = [[0] * 3] * len(self.alph)
+        for i in range(len(Q_hat[0])):
+            for j in range(len(Q_hat)):
+                Q_hat[i][j] = dict(zip(self.alph, self.record.matrix[:, j]))
 
         return Q_hat
 

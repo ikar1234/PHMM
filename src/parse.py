@@ -30,15 +30,16 @@ def create_pwm(file: List[str], ftype: str, alph: str) -> Record:
             re.sub(' ', '', ''.join([re.findall(' (.*)', file[i])[0].strip() for i in range(k, len(file), n_seq + 1)]))
             for k in range(1, n_seq + 1)]
     else:
-        seq = file[1:]
+        # remove new lines
+        seq = [s.strip() for s in file[1:]]
         n_seq = len(file)
         # for consistency with the other format
         ids = [seq[0]]
     # TODO: currently, meta data is parsed into MEME format; change?
     # sequence length
     seq_len = len(seq[0])
-    if alph.upper().startswith('A'):
-        alength = 4
+    if alph.upper() == ('DNA'):
+        alength = 5
         al = "A C G T -".split(' ')
     else:
         # add ? character
@@ -46,8 +47,6 @@ def create_pwm(file: List[str], ftype: str, alph: str) -> Record:
         al = "A C D E F G H I K L M N P Q R S T V W Y ? -".split(' ')
     matrix = np.zeros((alength, seq_len))
     for i in range(seq_len):
-        seq = [s.strip() for s in seq]
-        print(seq_len)
         c = Counter([s.strip()[i] for s in seq])
         # add letters which occur 0 times
         for a in al:

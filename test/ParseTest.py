@@ -37,13 +37,10 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(alength, a)
 
     def test_plain(self):
-        rec = parse(MyTestCase.plain, ftype="txt")
-
-        print(rec.matrix)
+        parse(MyTestCase.plain, ftype="txt")
 
     def test_ungapped(self):
-        rec = parse(MyTestCase.ungapped, ftype="txt")
-        print(rec.matrix)
+        parse(MyTestCase.ungapped, ftype="txt")
 
 
 if __name__ == '__main__':
