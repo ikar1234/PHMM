@@ -10,7 +10,7 @@ class MyTestCase(unittest.TestCase):
 
     record = parse(path, ftype='meme')
     # with training data
-    phmm = PHMM(record, alph="dna")
+    # phmm = PHMM(record, alph="dna")
 
     # without training data
     phmm2 = PHMM()
@@ -19,26 +19,37 @@ class MyTestCase(unittest.TestCase):
             "CCCATCAAACT",
             "ACGATCACTCT"]
 
-    def test_something(self):
-        self.assertEqual(True, True)
+    # def test_something(self):
+    #     rec = parse('plain.txt',ftype='txt')
+    #     pl = PHMM(rec)
+    #     print(pl.P)
+    #     print(pl.Q)
 
-    def test_evaluate(self):
-        lkh = MyTestCase.phmm.evaluate("AAAAAAAAAAA", log=False)
-        self.assertEqual(lkh, 0)
+    def test_make_paths(self):
+        # Examlpe is taken from Durbin
+        states = [0, 0, 1, 1, 0]
+        seqs = ["VG--H", "V---N", "VE--D", "IAADN"]
 
-        lkh = MyTestCase.phmm.evaluate("TATTGCACAAT", log=False)
-        self.assertAlmostEqual(lkh, 0.036, places=3)
+        p = PHMM.make_paths(states, seqs)
+        print(list(p))
 
-    def test_viterbi_decoding(self):
-        gapped_phmm = PHMM(parse(filepath='../test/plain.txt', ftype='txt'))
-        b = list(gapped_phmm.viterbi_decoding("ATTGACGTACGTAAT"))
-        print(b)
-
-    def test_baum_welch(self):
-        gapped_phmm = PHMM(parse(filepath='../test/plain.txt', ftype='txt'))
-
-        msa = gapped_phmm.train(seqs=MyTestCase.seqs, method='viterbi')
-        print(msa)
+    # def test_evaluate(self):
+    #     lkh = MyTestCase.phmm.evaluate("AAAAAAAAAAA", log=False)
+    #     self.assertEqual(lkh, 0)
+    #
+    #     lkh = MyTestCase.phmm.evaluate("TATTGCACAAT", log=False)
+    #     self.assertAlmostEqual(lkh, 0.036, places=3)
+    #
+    # def test_viterbi_decoding(self):
+    #     gapped_phmm = PHMM(parse(filepath='../test/plain.txt', ftype='txt'))
+    #     b = list(gapped_phmm.viterbi_decoding("ATTGACGTACGTAAT"))
+    #     print(b)
+    #
+    # def test_baum_welch(self):
+    #     gapped_phmm = PHMM(parse(filepath='../test/plain.txt', ftype='txt'))
+    #
+    #     msa = gapped_phmm.train(seqs=MyTestCase.seqs, method='viterbi')
+    #     print(msa)
 
     # def test_compare(self):
     #     seq = "TATTGCACAAT"

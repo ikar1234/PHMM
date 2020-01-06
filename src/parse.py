@@ -59,7 +59,7 @@ def create_pwm(file: List[str], ftype: str, alph: str) -> Record:
     meta = {'alength': alength, 'nsites': n_seq, 'E': 0}
     # use first sequence for name
     name = ids[0]
-    record = Record(name=name, matrix=matrix, ftype=ftype, meta=meta)
+    record = Record(name=name, matrix=matrix, ftype=ftype, meta=meta, seqs=file)
     return record
 
 

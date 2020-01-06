@@ -10,9 +10,9 @@ class PHMM:
     # transition probability matrix
     P: np.ndarray
     # emission probability matrix
-    Q: np.ndarray
+    Q: List
     # initial probabilities
-    states: List[int]
+    columns: List[int]
     # alphabet
     alph: List[str]
     # length of the model
@@ -32,13 +32,13 @@ class PHMM:
                 self.alph = "A C G T".split(' ')
             else:
                 self.alph = "A C D E F G H I K L M N P Q R S T V W Y".split(' ')
-            self.P = self.mle_P()
-            self.Q = self.mle_Q()
+            self.P = self._mle_P()
+            self.Q = self._mle_Q()
         else:
             self.record = None
             self.P = None
             self.Q = None
-            self.states = None
+            self.columns = None
             self.alph = "A C G T".split(' ')
 
     def _annotate(self):
@@ -52,28 +52,42 @@ class PHMM:
         # else the state is inserting (=1)
 
         gaps_func = lambda x: 0 if x <= 0.5 else 1
-        self.states = [gaps_func(x) for x in self.record.matrix[-1, :]]
+        self.columns = [gaps_func(x) for x in self.record.matrix[0, :]]
 
-    def mle_P(self) -> np.ndarray:
+        # the length of the PHMM is the number of matching states
+        self.l = sum([x == 0 for x in self.columns])
+
+    def _mle_P(self) -> np.ndarray:
         """
         Maximum likelihood estimator for the transition matrix.
         :return:
         """
-        # estimate number of transitions from every state to
-        # every other state from the matrix
+        # states
+        # TODO: matrices become too sparse
+        st = self.columns
 
-        P_hat = np.zeros((3, 3))
+        n_match = sum([x == 0 for x in st])
+        n_insert = len(st) - n_match
+        # sequences from alignment
+        seqs = self.record.seqs
 
-        st = self.states
-        l = len(st)
-        for i in range(l - 1):
-            P_hat[st[i], st[i + 1]] += 1
+        seq_paths = list(PHMM.make_paths(self.columns, seqs))
 
-        P_hat = self._normalize(P_hat, pseudo=True)
+
+        match_trans = np.zeros(())
+        insert_trans = np.zeros(())
+        delete_trans = np.zeros(())
+        P_hat = match_trans[match_trans, insert_trans, delete_trans]
+
+        # a long sequence of cases
+
+        P_hat[0] = self._normalize(P_hat[0], pseudo=True)
+        P_hat[1] = self._normalize(P_hat[1], pseudo=True)
+        P_hat[2] = self._normalize(P_hat[2], pseudo=True)
 
         return P_hat
 
-    def mle_Q(self):
+    def _mle_Q(self):
         """
         Maximum likelihood estimator for the emission matrix.
         :return:
@@ -81,11 +95,26 @@ class PHMM:
         # count the number of emissions
 
         # list of list of dictionary objects
+        st = self.columns
+        n_match = sum([x == 0 for x in st])
+        n_insert = len(st) - n_match
+        # emission probabilities for all match and insert states
+        match_emission = np.zeros((n_match, len(self.alph)))
+        insert_emission = np.zeros((n_insert, len(self.alph)))
+        c_m = c_i = 0
 
-        Q_hat = [[0] * 3] * len(self.alph)
-        for i in range(len(Q_hat[0])):
-            for j in range(len(Q_hat)):
-                Q_hat[i][j] = dict(zip(self.alph, self.record.matrix[:, j]))
+        for i in range(len(st)):
+            # track the number of matching and inserting states
+            if st[i] == 0:
+                # dont count the gaps and normalize
+                match_emission[c_m, :] = self.record.matrix[1:, i]
+                c_m += 1
+            else:
+                insert_emission[c_i, :] = self.record.matrix[1:, i]
+                c_i += 1
+        assert c_m == n_match and c_i == n_insert
+
+        Q_hat = [match_emission, insert_emission]
 
         return Q_hat
 
@@ -130,7 +159,8 @@ class PHMM:
             for t in range(3):
                 last_column = trellis[:, n - 1] * self.P[t, :]
                 ind = self.alph.index(seq[n])
-                trellis[t, n] = self.Q[t, ind] * np.max(last_column)
+                print(self.Q[t][n])
+                trellis[t, n] = self.Q[t][n].get(seq[n]) * np.max(last_column)
                 backpointers[t, n] = np.argmax(last_column)
         last = np.argmax(trellis[:, l_seq - 1])
 
@@ -185,7 +215,7 @@ class PHMM:
         for i in range(1, l):
             for st in range(n):
                 letter = self.alph.index(seq[i])
-                fwd[st, i] = self.Q[st, letter] * np.dot(fwd[:, i - 1], self.P[:, st])
+                fwd[st, i] = self.Q[st][i, letter] * np.dot(fwd[:, i - 1], self.P[:, st])
 
         return fwd
 
@@ -211,7 +241,8 @@ class PHMM:
             for k in range(n):
                 # What if l > len(seq)?
                 letter = self.alph.index(seq[i + 1])
-                bwd[k, i] = np.sum(self.P[k, :] * self.Q[:, letter] * bwd[:, i + 1])
+                bwd[k, i] = np.sum(
+                    self.P[k, :] * np.array([self.Q[i][st, letter] for st in range(n)]) * bwd[:, i + 1])
 
         return bwd
 
@@ -246,7 +277,8 @@ class PHMM:
         n_seq = len(seqs)
 
         self.P = np.random.rand(3, 3)
-        self.Q = np.random.rand(3, l)
+        # TODO
+        self.Q = [np.random.rand(3, l), np.random.rand(3, 3)]
 
         P_hat = self.P
         Q_hat = self.Q
@@ -350,3 +382,31 @@ class PHMM:
             else:
                 new_matrix = m / row_sums[:, None]
             return new_matrix
+
+    @staticmethod
+    def make_paths(states, seqs):
+        """
+        Infer the states of each sequence in the multiple alignment.
+        :param states: states of the PHMM
+        :param seqs: sequences with gaps
+        :return:
+        """
+        for s in seqs:
+            path = []
+            for i in range(len(states)):
+                if s[i] == '-':
+                    # gap in a matching state
+                    if states[i] == 0:
+                        path.append(2)
+                    else:
+                        pass
+                # symbol
+                else:
+                    # match
+                    if states[i] == 0:
+                        path.append(0)
+                    # insert
+                    else:
+                        path.append(1)
+
+            yield path
