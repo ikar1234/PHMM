@@ -1,6 +1,6 @@
 import unittest
 
-from PHMM.src.Records import Record
+from src.Records import Record
 
 
 class MyTestCase(unittest.TestCase):
