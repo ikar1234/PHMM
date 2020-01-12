@@ -1,6 +1,6 @@
 import unittest
 
-from PHMM.src.parse import parse
+from parse import parse
 
 
 # use this for Travis

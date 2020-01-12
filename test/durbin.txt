@@ -1,0 +1,5 @@
+> Example from Durbin
+A--TCAACG
+AGTTCAA-G
+AGTTCAATT
+-GTTC-ACG

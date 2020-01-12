@@ -1,7 +1,6 @@
 """
-Similar to the Record class from Bio.motifs.records, but I'll tyr to make it more flexible for my purposes
+Used for storing the sequences or the multiple alignment.
 """
-import numpy as np
 from typing import Dict, List
 
 
@@ -10,25 +9,21 @@ class Record:
     Record class which holds the information about the parsed PWM.
     """
     name: str
-    matrix: np.ndarray
-    ftype: str
-    meta: Dict
     seqs: List[str]
-    __slots__ = ("name", "matrix", "ftype", "meta", 'seqs')
+    alph: str
+    aligned: bool
+    __slots__ = ("name", 'seqs', 'alph', 'aligned')
 
-    def __init__(self, name=None, matrix=None, ftype=None, meta=None, seqs=None):
+    def __init__(self, name=None, seqs=None, alph="dna", aligned=False):
         self.name = name
-        self.matrix = matrix
-        self.ftype = ftype
-        self.meta = meta
         self.seqs = seqs
+        self.alph = alph
+        self.aligned = aligned
 
     def __str__(self):
         s = f"Record \n" \
             f"Name: {self.name} \n" \
-            f"Position Weight Matrix:\n {self.matrix} \n" \
-            f"Input format: {self.ftype} \n" \
-            f"Meta data: {', '.join([k + '= ' + str(v) for k, v in self.meta.items()])}"
+            f"Alphabet: {self.alph} \n"
         return s
 
     def todict(self) -> Dict:
